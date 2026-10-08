@@ -36,7 +36,7 @@ cli-top config
 cli-top config auto-select [on|off]
 ```
 
-Shows or changes settings. `auto-select` (default `on`) makes semester commands use the latest semester; `off` lists semesters every time. The setting survives logout.
+Shows or changes settings. `auto-select` (default `on`) makes semester commands pick the active semester by date; `off` lists semesters every time. The setting survives logout.
 
 ## Academic records
 
@@ -49,7 +49,7 @@ Shows or changes settings. `auto-select` (default `on`) makes semester commands 
 | `cli-top attendance` | `-s`, `--semester INDEX`; `-l`, `--list` | Show attendance and skip/attend guidance. |
 | `cli-top exams` | `-s`, `--semester INDEX`; `-l`, `--list` | Show the upcoming exam schedule. |
 
-Every command that takes `--semester` (except `timetable`) uses the latest semester by default, shows which one it picked, and ends with a reminder that `--list` / `-l` lets you choose another semester from a table. `attendance` and `exams` fall back to the most recent semester that has data. Run `cli-top config auto-select off` to always list semesters instead (`on` restores the default).
+Every command that takes `--semester` (except `timetable`) picks the active semester by date: the latest Fall semester from July to October and the latest Winter semester from January to April. It shows which one it picked and ends with a reminder that `--list` / `-l` lets you choose another semester from a table. In May, June, November and December, when VTOP may already list an upcoming semester, the table is shown instead. `attendance` and `exams` fall back to the most recent semester that has data. Run `cli-top config auto-select off` to always list semesters instead (`on` restores the default).
 
 ## Schedule and planning
 

@@ -154,7 +154,7 @@ func fetchAndSelectCourse(regNo string, cookies types.Cookies, semesterFlag int,
 		semesters = append(semesters, si.Raw)
 	}
 
-	selectedSemester, err := chooseCourseSemester(semesters, semesterFlag)
+	selectedSemester, err := chooseCourseSemester(semesters, semesterFlag, helpers.SemesterNow())
 	if err != nil {
 		return types.Course{}, err
 	}
@@ -198,17 +198,21 @@ func fetchAndSelectCourse(regNo string, cookies types.Cookies, semesterFlag int,
 	return selectedCourse, nil
 }
 
-func chooseCourseSemester(semesters []string, semesterFlag int) (string, error) {
+func chooseCourseSemester(semesters []string, semesterFlag int, now time.Time) (string, error) {
 	if len(semesters) == 0 {
 		return "", fmt.Errorf("no courses found")
 	}
 	if semesterFlag < 0 {
 		return "", fmt.Errorf("invalid semester selection")
 	}
-	if semesterFlag == 0 && (!helpers.ShouldListSemesters() || helpers.ShouldMuteUI()) {
-		selectedSemester := semesters[len(semesters)-1]
-		helpers.AnnounceAutoSelectedSemester(selectedSemester)
-		return selectedSemester, nil
+	if semesterFlag == 0 && !helpers.ShouldListSemesters() {
+		if index := helpers.ActiveSemesterIndex(semesters, now); index >= 0 {
+			helpers.AnnounceAutoSelectedSemester(semesters[index])
+			return semesters[index], nil
+		}
+	}
+	if semesterFlag == 0 && helpers.ShouldMuteUI() {
+		return semesters[len(semesters)-1], nil
 	}
 
 	semTable := [][]string{{"SEMESTER"}}

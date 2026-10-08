@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 )
@@ -15,6 +16,10 @@ import (
 const autoSelectSemesterEnvKey = "AUTO_SELECT_SEMESTER"
 
 var ListSemesters bool
+
+var semesterNow = func() time.Time {
+	return time.Now().In(time.FixedZone("IST", 5*3600+1800))
+}
 
 var semesterAutoSelected bool
 
@@ -37,6 +42,34 @@ func SetAutoSelectSemester(enabled bool) error {
 
 func ShouldListSemesters() bool {
 	return ListSemesters || !AutoSelectSemesterEnabled()
+}
+
+func activeSemesterPrefix(now time.Time) string {
+	switch now.Month() {
+	case time.July, time.August, time.September, time.October:
+		return "fall semester"
+	case time.January, time.February, time.March, time.April:
+		return "winter semester"
+	default:
+		return ""
+	}
+}
+
+func ActiveSemesterIndex(names []string, now time.Time) int {
+	prefix := activeSemesterPrefix(now)
+	if prefix == "" {
+		return -1
+	}
+	for i := len(names) - 1; i >= 0; i-- {
+		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(names[i])), prefix) {
+			return i
+		}
+	}
+	return -1
+}
+
+func SemesterNow() time.Time {
+	return semesterNow()
 }
 
 func AnnounceAutoSelectedSemester(name string) {
@@ -162,11 +195,20 @@ func selectSemester(regNo string, cookies types.Cookies, sem_choice int, autoSel
 		nested_sem_list = append(nested_sem_list, []string{semDetails[i].SemID, semDetails[i].SemName})
 	}
 
-	if sem_choice <= 0 && (autoSelect || os.Getenv("CLI_TOP_PROXY_MODE") == "1") {
-		selectedSem = semDetails[len(semDetails)-1]
-		if autoSelect {
-			AnnounceAutoSelectedSemester(selectedSem.SemName)
+	if sem_choice <= 0 && autoSelect {
+		names := make([]string, len(semDetails))
+		for i, semester := range semDetails {
+			names[i] = semester.SemName
 		}
+		if index := ActiveSemesterIndex(names, semesterNow()); index >= 0 {
+			selectedSem = semDetails[index]
+			AnnounceAutoSelectedSemester(selectedSem.SemName)
+			return selectedSem, nil
+		}
+	}
+
+	if sem_choice <= 0 && os.Getenv("CLI_TOP_PROXY_MODE") == "1" {
+		selectedSem = semDetails[len(semDetails)-1]
 		return selectedSem, nil
 	}
 

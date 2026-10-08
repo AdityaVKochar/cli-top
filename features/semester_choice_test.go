@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 )
 
 func TestSemesterCandidatesAutomaticNewestFirst(t *testing.T) {
@@ -59,39 +60,63 @@ func TestSemesterCandidatesRejectsInvalidChoice(t *testing.T) {
 	}
 }
 
-func TestChooseCourseSemesterDefaultsToLatest(t *testing.T) {
+var (
+	courseSemesters = []string{"Fall Semester 2025-26", "Winter Semester 2025-26", "Fall Semester 2026-27"}
+	octoberNow      = time.Date(2026, time.October, 8, 9, 0, 0, 0, time.UTC)
+	februaryNow     = time.Date(2026, time.February, 8, 9, 0, 0, 0, time.UTC)
+	decemberNow     = time.Date(2026, time.December, 8, 9, 0, 0, 0, time.UTC)
+)
+
+func TestChooseCourseSemesterPicksActiveSemester(t *testing.T) {
 	t.Setenv("AUTO_SELECT_SEMESTER", "true")
 	t.Setenv("CLI_TOP_PROXY_MODE", "")
-	semesters := []string{"Fall Semester 2025-26", "Winter Semester 2025-26"}
 
-	got, err := chooseCourseSemester(semesters, 0)
+	for _, tc := range []struct {
+		now  time.Time
+		want string
+	}{
+		{now: octoberNow, want: "Fall Semester 2026-27"},
+		{now: februaryNow, want: "Winter Semester 2025-26"},
+	} {
+		got, err := chooseCourseSemester(courseSemesters, 0, tc.now)
+		if err != nil {
+			t.Fatalf("chooseCourseSemester(%s) returned an error: %v", tc.now.Month(), err)
+		}
+		if got != tc.want {
+			t.Fatalf("chooseCourseSemester(%s) = %q, want %q", tc.now.Month(), got, tc.want)
+		}
+	}
+}
+
+func TestChooseCourseSemesterListsInTransitionMonths(t *testing.T) {
+	t.Setenv("AUTO_SELECT_SEMESTER", "true")
+	t.Setenv("CLI_TOP_PROXY_MODE", "")
+	withStdin(t, "2\n")
+
+	got, err := chooseCourseSemester(courseSemesters, 0, decemberNow)
 	if err != nil {
 		t.Fatalf("chooseCourseSemester returned an error: %v", err)
 	}
 	if got != "Winter Semester 2025-26" {
-		t.Fatalf("got %q, want latest semester", got)
+		t.Fatalf("got %q, want the semester picked from the list", got)
 	}
 }
 
 func TestChooseCourseSemesterExplicitAndInvalidChoices(t *testing.T) {
 	t.Setenv("AUTO_SELECT_SEMESTER", "true")
-	semesters := []string{"Fall Semester 2025-26", "Winter Semester 2025-26"}
-
-	got, err := chooseCourseSemester(semesters, 1)
+	got, err := chooseCourseSemester(courseSemesters, 1, octoberNow)
 	if err != nil || got != "Fall Semester 2025-26" {
 		t.Fatalf("chooseCourseSemester(1) = %q, %v; want first semester", got, err)
 	}
-	if _, err := chooseCourseSemester(semesters, -1); err == nil {
+	if _, err := chooseCourseSemester(courseSemesters, -1, octoberNow); err == nil {
 		t.Fatal("expected a negative choice to be rejected")
 	}
-	if _, err := chooseCourseSemester(nil, 0); err == nil {
+	if _, err := chooseCourseSemester(nil, 0, octoberNow); err == nil {
 		t.Fatal("expected an empty semester list to be rejected")
 	}
 }
 
 func TestChooseCourseSemesterListsWhenRequested(t *testing.T) {
-	semesters := []string{"Fall Semester 2025-26", "Winter Semester 2025-26"}
-
 	for _, tc := range []struct {
 		name string
 		env  string
@@ -107,7 +132,7 @@ func TestChooseCourseSemesterListsWhenRequested(t *testing.T) {
 			t.Cleanup(func() { helpers.ListSemesters = false })
 			withStdin(t, "1\n")
 
-			got, err := chooseCourseSemester(semesters, 0)
+			got, err := chooseCourseSemester(courseSemesters, 0, octoberNow)
 			if err != nil {
 				t.Fatalf("chooseCourseSemester returned an error: %v", err)
 			}

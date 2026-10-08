@@ -36,23 +36,61 @@ func TestFindAndSaveSemIDsRejectsMissingOptions(t *testing.T) {
 	}
 }
 
-func TestSelectSemesterDefaultsToLatestAndQueuesListHint(t *testing.T) {
+var sampleSemesterNames = []string{
+	"Fall Semester 2024-25 - VLR",
+	"Winter Semester 2024-25 - VLR",
+	"Fall Semester 2025-26 - VLR",
+	"Winter Semester 2025-26 - VLR",
+	"Fall Semester 2026-27 - VLR",
+}
+
+func TestActiveSemesterIndexFollowsMonth(t *testing.T) {
+	for month := time.January; month <= time.December; month++ {
+		want := -1
+		switch month {
+		case time.July, time.August, time.September, time.October:
+			want = 4
+		case time.January, time.February, time.March, time.April:
+			want = 3
+		}
+		now := time.Date(2026, month, 15, 12, 0, 0, 0, time.UTC)
+		if got := ActiveSemesterIndex(sampleSemesterNames, now); got != want {
+			t.Errorf("ActiveSemesterIndex(%s) = %d, want %d", month, got, want)
+		}
+	}
+}
+
+func TestActiveSemesterIndexIgnoresOtherTerms(t *testing.T) {
+	names := []string{"Fall Semester 2025-26", "Fall Inter Semester 2025-26", "Summer Semester 2025-26"}
+	if got := ActiveSemesterIndex(names, time.Date(2026, time.August, 1, 0, 0, 0, 0, time.UTC)); got != 0 {
+		t.Fatalf("ActiveSemesterIndex() = %d, want the regular fall semester", got)
+	}
+	if got := ActiveSemesterIndex(names, time.Date(2026, time.February, 1, 0, 0, 0, 0, time.UTC)); got != -1 {
+		t.Fatalf("ActiveSemesterIndex() = %d, want -1 when no winter semester exists", got)
+	}
+}
+
+func TestSelectSemesterPicksActiveSemesterAndQueuesListHint(t *testing.T) {
 	const regNo = "TESTAUTOSELECT"
 	semCacheMu.Lock()
 	semCache[regNo] = semesterCacheEntry{
 		semesters: []types.Semester{
 			{SemID: "OLD", SemName: "Fall Semester 2025-26"},
 			{SemID: "NEW", SemName: "Winter Semester 2025-26"},
+			{SemID: "UPCOMING", SemName: "Fall Semester 2026-27"},
 		},
 		cachedAt: time.Now(),
 	}
 	semCacheMu.Unlock()
+	previousNow := semesterNow
+	semesterNow = func() time.Time { return time.Date(2026, time.March, 10, 9, 0, 0, 0, time.UTC) }
 	t.Cleanup(func() {
 		semCacheMu.Lock()
 		delete(semCache, regNo)
 		semCacheMu.Unlock()
 		ListSemesters = false
 		semesterAutoSelected = false
+		semesterNow = previousNow
 	})
 
 	t.Setenv(autoSelectSemesterEnvKey, "true")
@@ -62,7 +100,7 @@ func TestSelectSemesterDefaultsToLatestAndQueuesListHint(t *testing.T) {
 		t.Fatalf("SelectSemester() error = %v", err)
 	}
 	if got.SemID != "NEW" {
-		t.Fatalf("SelectSemester() = %q, want latest semester %q", got.SemID, "NEW")
+		t.Fatalf("SelectSemester() = %q, want active winter semester %q", got.SemID, "NEW")
 	}
 	if !semesterAutoSelected {
 		t.Fatal("expected auto-selection to queue the --list hint")

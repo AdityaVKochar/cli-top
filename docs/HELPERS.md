@@ -29,12 +29,14 @@ keeps timeout, TLS, proxy, connection reuse, and test behavior consistent.
   registration) cannot overwrite a newer value.
 - `GetSemDetails` tries the attendance page first and the course-page endpoint
   as a fallback.
-- `SelectSemester` picks the latest semester unless `--semester` or
-  `--list` (`ListSemesters`) is given or auto-select is turned off with
-  `cli-top config auto-select off` (`AUTO_SELECT_SEMESTER` in the config file), in which case it uses the index or
-  renders the shared selector. Auto-selection is announced via
-  `AnnounceAutoSelectedSemester`, and `CommandRunner` prints the `--list` hint
-  afterwards through `PrintSemesterListHint`.
+- `SelectSemester` picks the active semester with `ActiveSemesterIndex`: the
+  latest Fall semester in July–October and the latest Winter semester in
+  January–April. In other months, or when `--semester`, `--list`
+  (`ListSemesters`) or `cli-top config auto-select off`
+  (`AUTO_SELECT_SEMESTER`) applies, it uses the index or renders the shared
+  selector. Auto-selection is announced via `AnnounceAutoSelectedSemester`, and
+  `CommandRunner` prints the `--list` hint afterwards through
+  `PrintSemesterListHint`.
 
 ## Terminal output and selection
 
